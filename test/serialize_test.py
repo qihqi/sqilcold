@@ -1,5 +1,4 @@
 import dataclasses
-import json
 import unittest
 import datetime
 from typing import Optional, List

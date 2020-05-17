@@ -116,8 +116,6 @@ class SerializableData(object):
         return deserialize(cls, dict_input)
 
 
-
-
 def mkgetter(obj: Any) -> Callable:
     if hasattr(obj, 'get'):
         return obj.get

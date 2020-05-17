@@ -1,17 +1,16 @@
 import dataclasses
-from collections.abc import Iterable
+from collections import abc
 
 from sqlalchemy.inspection import inspect
 
 from typing import (Type, TypeVar, Generic,
-                    Mapping, Optional, List)
+                    Mapping, Optional, Any, Iterable)
 
 from .serialization import fieldcopy
 from .serialization import SerializableData
 
-Base = object
 
-DBType = TypeVar('DBType', bound=Base)  # this is one of the sqlalchemy classes
+DBType = TypeVar('DBType')
 SelfType = TypeVar('SelfType', bound='SerializableDB')
 class SerializableDB(SerializableData, Generic[DBType]):
     """Interface for objects that knows how to convert into a db object.
@@ -107,14 +106,15 @@ class DBA(object):
             pkey_col == pkey).delete(synchronize_session='fetch')
         return count
 
-    def getone(self, objclass: Type[T], **kwargs) -> Optional[T]:
-        result = self.search(objclass, **kwargs)
-        if not result:
+    def getone(self, objclass: Type[T], kwargs: Mapping[str, Any]) -> Optional[T]:
+        try:
+            result = self.search(objclass, kwargs)
+            return next(iter(result))
+        except:
             return None
-        return result[0]
 
     def search(
-        self, objclass: Type[T], **kwargs) -> List[T]:
+        self, objclass: Type[T], kwargs: Mapping[str, Any]) -> Iterable[T]:
         query = self.session.query(objclass.db_class)
         columns = inspect(objclass.db_class).columns
         for key, value in list(kwargs.items()):
@@ -130,7 +130,7 @@ class DBA(object):
             if mode == 'gte':
                 f = col >= value
             query = query.filter(f)
-        return list(map(objclass.from_db_instance, iter(query)))
+        return map(objclass.from_db_instance, iter(query))
 
     def _get_pkey_name(self, cls: Type[SerializableDB]) -> str:
         if hasattr(cls, '_pkey_name'):
@@ -149,8 +149,8 @@ def sqldataclass(dbclass, override_name=None):
     classname = override_name or dbclass.__name__
     for c in columns:
         ptype = c.type.python_type
-        if issubclass(ptype, Iterable):
-            field = dataclasses.field(defaultfactory=lambda: ptype())
+        if issubclass(ptype, abc.Iterable):
+            field = dataclasses.field(default_factory=lambda: ptype())
         else:
             field = dataclasses.field(default=None)
         columns_tuple.append(
